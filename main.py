@@ -201,3 +201,8 @@ async def on_ready():
 def start_bot():
     # Upewnij się, że używasz zmiennej 'bot' lub 'client', której używa Twoja aplikacja
     bot.run(DISCORD_TOKEN)
+# Zastępuje blokujące bot.run(DISCORD_TOKEN)
+t = Thread(target=start_bot)
+t.start()
+
+# Render teraz wraca do Gunicorna, który może otworzyć port.
