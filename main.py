@@ -1,5 +1,4 @@
-from keep_alive import keep_alive
-keep_alive()
+from keep_alive import app
 import discord
 import os
 import requests
@@ -193,11 +192,13 @@ async def on_ready():
     if not check_for_new_ads.is_running():
         check_for_new_ads.start()
 
-# Uruchomienie Bota
-if DISCORD_TOKEN:
-    try:
-        bot.run(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"Błąd uruchomienia Bota: {e}")
-else:
-    print("BŁĄD: Brak DISCORD_TOKEN w pliku .env. Uzupełnij go, aby uruchomić Bota.")
+# --- Poniżej Linii 194 (Uruchom pętlę sprawdzającą) ---
+
+# Użyj swojej zmiennej, która przechowuje token
+# Zwykle to wygląda tak:
+# token = os.environ.get('DISCORD_TOKEN')
+
+# Uruchomienie Bota (To musi być OSTATNIA rzecz)
+bot.run(DISCORD_TOKEN) # Jeśli używasz obiektu 'bot' (commands.Bot)
+# LUB
+# client.run(DISCORD_TOKEN) # Jeśli używasz obiektu 'client' (discord.Client)
