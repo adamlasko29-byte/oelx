@@ -16,7 +16,7 @@ DISCORD_WEBHOOK = os.environ.get('DISCORD_WEBHOOK')
 # - q=iphone (filtr ogólny)
 # - search[filter_float_price:to]=900 (Max cena 900 zł)
 # - search[city_id]=14728 (Jaroszów)
-OLX_URL = "https://www.olx.pl/elektronika/telefony/q-iphone/?search%5Bfilter_float_price%3Ato%5D=900&search%5Bcity_id%5D=14728" 
+OLX_URL = "https://www.olx.pl/elektronika/telefony/jaroszow/q-iphone/?search%5Bdist%5D=50&search%5Bfilter_float_price:to%5D=900" 
 
 # Modele, które muszą znaleźć się w tytule
 IPHONE_MODELS = [
@@ -80,21 +80,23 @@ def test_discord_connection():
 
 # --- GŁÓWNA FUNKCJA MONITORUJĄCA ---
 
+# W pliku main.py, zaktualizuj całą funkcję sprawdz_olx()
+
 def sprawdz_olx():
     """Pobiera dane z OLX, parsuje je i wysyła powiadomienia o nowych ofertach."""
     global scraped_post_ids
     print(f"Sprawdzam OLX na URL: {OLX_URL}")
     
-    # Nagłówki, które symulują przeglądarkę i akceptują język/ciasteczka
+    # Nagłówki (pozostają bez zmian)
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cookie': 'gdpr_consent=true; cookies_consent=1' # Próba ominięcia banerów cookies
+        'Cookie': 'gdpr_consent=true; cookies_consent=1' 
     }
     
     try:
         response = requests.get(OLX_URL, headers=headers)
-        response.raise_for_status() # Wyrzuci wyjątek dla błędów 4xx/5xx
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
     except requests.exceptions.RequestException as e:
         print(f"Błąd podczas pobierania strony lub połączenia: {e}")
@@ -102,18 +104,26 @@ def sprawdz_olx():
 
     znalezione_ogloszenia = []
     
-    # Najbardziej stabilne podejście: szukanie po atrybucie 'data-cy'
+    # Krok 1: Znalezienie wszystkich kontenerów ogłoszeń (wydaje się stabilne)
     ogloszenia_html = soup.find_all('div', {'data-cy': 'l-card'})
 
     for card in ogloszenia_html:
-        link_el = card.find('a', href=True)
-        title_el = card.find('h6')
-        price_el = card.find('p', class_=lambda x: x and 'price' in x) 
-
-        if link_el and title_el:
-            link = "https://www.olx.pl" + link_el['href']
-            tytul = title_el.text.strip()
-            cena = price_el.text.strip() if price_el else 'Nie podano'
+        
+        # Krok 2: Użycie nowego, stabilnego atrybutu 'data-testid' dla LINKU i TYTUŁU
+        # Link do ogłoszenia jest teraz w elemencie <a> z atrybutem data-testid="ad-card-title"
+        link_title_el = card.find('a', {'data-testid': 'ad-card-title'})
+        
+        # Krok 3: Użycie nowego, stabilnego atrybutu 'data-testid' dla CENY
+        price_el = card.find('p', {'data-testid': 'ad-price'})
+        
+        # Sprawdzenie, czy kluczowe elementy zostały znalezione
+        if link_title_el and price_el:
+            link = "https://www.olx.pl" + link_title_el['href']
+            
+            # Tytuł jest tekstem wewnątrz elementu <a>
+            tytul = link_title_el.text.strip()
+            cena = price_el.text.strip()
+            
             ogloszenie_id = pobierz_id_z_linku(link)
             
             if ogloszenie_id:
@@ -123,8 +133,18 @@ def sprawdz_olx():
                     'price': cena,
                     'url': link
                 })
+        
+        # Dodanie debugowania, aby sprawdzić, ile ogłoszeń pominięto z powodu błędnego parsowania
+        # else:
+        #     print("DEBUG: Pominięto kartę ogłoszenia - brak kluczowych atrybutów.")
+
+
+    # ... (resztę funkcji: pętla deduplikacji i wysyłania powiadomień zostawiamy bez zmian)
     
     powiadomienia_wyslane = 0
+    
+    # Dodatkowe debugowanie, abyś wiedział, ile ogłoszeń zebrałeś
+    print(f"DEBUG: Zbieranie danych zakończone. Znaleziono {len(znalezione_ogloszenia)} potencjalnych ogłoszeń.")
     
     for ogloszenie in znalezione_ogloszenia:
         
@@ -134,7 +154,7 @@ def sprawdz_olx():
 
         # 2. Filtr modeli: Sprawdź, czy tytuł pasuje do szukanych modeli
         tytul_lower = ogloszenie['title'].lower()
-        jest_pasujace = any(model in tytul_lower for model in IPHONE_MODELS)
+        jest_pasujace = any(model.lower() in tytul_lower for model in IPHONE_MODELS)
         
         if jest_pasujace:
             # 3. Wysyłanie powiadomienia
@@ -146,8 +166,7 @@ def sprawdz_olx():
         scraped_post_ids.add(ogloszenie['id'])
 
     print(f"Zakończono sprawdzanie. Wysłałem {powiadomienia_wyslane} nowych powiadomień. Znanych ID: {len(scraped_post_ids)}")
-
-
+    
 def bot_loop():
     """Główna pętla, która będzie uruchamiana w tle w osobnym wątku."""
     
