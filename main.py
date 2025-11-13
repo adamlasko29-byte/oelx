@@ -7,6 +7,7 @@ import asyncio
 from bs4 import BeautifulSoup
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from threading import Thread
 
 # Wczytanie zmiennych środowiskowych (Sekretów) z Replit
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -197,8 +198,6 @@ async def on_ready():
 # Użyj swojej zmiennej, która przechowuje token
 # Zwykle to wygląda tak:
 # token = os.environ.get('DISCORD_TOKEN')
-
-# Uruchomienie Bota (To musi być OSTATNIA rzecz)
-bot.run(DISCORD_TOKEN) # Jeśli używasz obiektu 'bot' (commands.Bot)
-# LUB
-# client.run(DISCORD_TOKEN) # Jeśli używasz obiektu 'client' (discord.Client)
+def start_bot():
+    # Upewnij się, że używasz zmiennej 'bot' lub 'client', której używa Twoja aplikacja
+    bot.run(DISCORD_TOKEN)
