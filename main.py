@@ -4,21 +4,21 @@ from bs4 import BeautifulSoup
 import time
 from discord_webhook import DiscordWebhook, DiscordEmbed
 import re
+from flask import Flask
+import threading
 
-# --- KONFIGURACJA ---
+# --- KONFIGURACJA Z POBIERANIEM ZMIENNYCH ŚRODOWISKOWYCH ---
 
-# Pobiera URL webhooka z ustawień Render.com
+# Pobiera URL webhooka z ustawień Render.com (Zmienna środowiskowa DISCORD_WEBHOOK)
 DISCORD_WEBHOOK = os.environ.get('DISCORD_WEBHOOK') 
 
-# URL wyszukiwania na OLX z filtrami
+# URL wyszukiwania na OLX z filtrami:
 # - q=iphone (filtr ogólny)
 # - search[filter_float_price:to]=900 (Max cena 900 zł)
 # - search[city_id]=14728 (Jaroszów)
-# UWAGA: Filtr odległości '50km' jest trudny do zakodowania w statycznym URL, 
-# OLX automatycznie stosuje promień dla danego miasta.
 OLX_URL = "https://www.olx.pl/elektronika/telefony/q-iphone/?search%5Bfilter_float_price%3Ato%5D=900&search%5Bcity_id%5D=14728" 
 
-# Modele, które muszą znaleźć się w tytule (dla podwójnej pewności)
+# Modele, które muszą znaleźć się w tytule
 IPHONE_MODELS = [
     "13 mini", "13 pro", "13 pro max", 
     "14", "14 pro", "14 pro max"
@@ -85,12 +85,11 @@ def sprawdz_olx():
     global scraped_post_ids
     print(f"Sprawdzam OLX na URL: {OLX_URL}")
     
-    # Nagłówki, które symulują przeglądarkę i akceptują język
+    # Nagłówki, które symulują przeglądarkę i akceptują język/ciasteczka
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-        # Dodanie nagłówka Cookie, który akceptuje podstawowe ciasteczka (może pomóc)
-        'Cookie': 'gdpr_consent=true; cookies_consent=1'
+        'Cookie': 'gdpr_consent=true; cookies_consent=1' # Próba ominięcia banerów cookies
     }
     
     try:
@@ -109,7 +108,6 @@ def sprawdz_olx():
     for card in ogloszenia_html:
         link_el = card.find('a', href=True)
         title_el = card.find('h6')
-        # Klasa ceny często zawiera frazę 'price'
         price_el = card.find('p', class_=lambda x: x and 'price' in x) 
 
         if link_el and title_el:
@@ -149,26 +147,23 @@ def sprawdz_olx():
 
     print(f"Zakończono sprawdzanie. Wysłałem {powiadomienia_wyslane} nowych powiadomień. Znanych ID: {len(scraped_post_ids)}")
 
-# --- GŁÓWNA PĘTLA URUCHAMIAJĄCA BOTA ---
 
-if __name__ == "__main__":
-    print("--- Startuję OLX Monitor ---")
+def bot_loop():
+    """Główna pętla, która będzie uruchamiana w tle w osobnym wątku."""
     
-    # 1. Sprawdzenie kluczowej zmiennej środowiskowej
+    # 1. Sprawdzenie i test przy starcie
     if not DISCORD_WEBHOOK:
-        print("BŁĄD KRYTYCZNY: Zmienna środowiskowa 'DISCORD_WEBHOOK' nie jest ustawiona. Zakończenie programu.")
-        exit(1)
+        print("BŁĄD KRYTYCZNY: Webhook nieustawiony. Bot nie rozpocznie pracy.")
+        return
         
-    # 2. Testowanie połączenia z Discordem
     if not test_discord_connection():
-         print("BŁĄD KRYTYCZNY: Połączenie z Discordem nieudane. Sprawdź poprawność URL webhooka.")
-         # Zakończ działanie, jeśli nie można wysłać wiadomości
-         exit(1) 
+         print("BŁĄD KRYTYCZNY: Połączenie z Discordem nieudane. Bot nie rozpocznie pracy.")
+         return 
 
-    # 3. Rozpoczęcie monitorowania
+    # 2. Uruchomienie pierwszej kontroli i głównej pętli
     print("Test Discord OK. Pierwsze uruchomienie: zapamiętuję istniejące ogłoszenia...")
     sprawdz_olx() 
-    print("Gotowe. Rozpoczynam monitorowanie w pętli.")
+    print("Rozpoczynam monitorowanie w pętli.")
     
     while True:
         try:
@@ -176,6 +171,25 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Wystąpił nieoczekiwany błąd w pętli: {e}")
         
-        # Czekanie 5 minut
+        # Czekanie 5 minut (300 sekund)
         print("Czekam 5 minut...")
         time.sleep(5 * 60)
+
+
+# --- APLIKACJA FLASK I START WĄTKU ---
+
+# Tworzymy instancję aplikacji Flask, która będzie obsługiwana przez Gunicorn
+app = Flask(__name__)
+
+# Endpoint, który Render będzie pingował (Uptime Robot)
+@app.route('/')
+def home():
+    # Zwraca status i informację o stanie bota
+    return f"OLX Monitor Bot jest aktywny i sprawdza ogłoszenia co 5 minut. Znane ID: {len(scraped_post_ids)}", 200
+
+# Uruchomienie pętli bota w osobnym wątku
+# To musi nastąpić przed tym, jak Gunicorn zacznie obsługiwać requesty Flask
+bot_thread = threading.Thread(target=bot_loop)
+# Ustawienie daemon=True pozwala na zamknięcie programu, gdy główny wątek (Flask) się zamknie
+bot_thread.daemon = True 
+bot_thread.start()
