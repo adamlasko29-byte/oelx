@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from threading import Thread
+import time
+from discord_webhook import DiscordWebhook, DiscordEmbed
 
 # Wczytanie zmiennych środowiskowych (Sekretów) z Replit
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -38,8 +40,61 @@ seen_ads = set()
 intents = discord.Intents.default()
 intents.message_content = True # Wymagane dla botów.
 bot = commands.Bot(command_prefix='!', intents=intents)
+# --- GŁÓWNA PĘTLA URUCHAMIAJĄCA BOTA ---
+if __name__ == "__main__":
+    print("--- Startuję OLX Monitor ---")
+    
+    # 1. Sprawdzenie, czy Webhook jest ustawiony (z Twojej wersji kodu)
+    if not DISCORD_WEBHOOK:
+        print("BŁĄD KRYTYCZNY: Zmienna środowiskowa 'DISCORD_WEBHOOK' nie jest ustawiona. Zakończenie programu.")
+        exit(1)
+        
+    # 2. TUTAJ MUSISZ WYWOŁAĆ FUNKCJĘ TESTOWĄ!
+    if not test_discord_connection():
+         print("BŁĄD KRYTYCZNY: Połączenie z Discordem nieudane. Zatrzymuję bota.")
+         # Zatrzymanie bota, jeśli test nie przeszedł
+         # exit(1) 
+
+    # 3. Rozpoczęcie normalnego działania (jeśli test się powiódł)
+    print("Kontynuuję. Pierwsze uruchomienie: zapamiętuję istniejące ogłoszenia...")
+    # Tutaj byłaby Twoja funkcja sprawdzająca OLX, np.:
+    # sprawdz_olx() 
+    print("Gotowe. Rozpoczynam monitorowanie w pętli.")
 
 # --- Funkcje Pomocnicze ---
+def test_discord_connection():
+    """Wysyła prostą wiadomość testową na Discorda."""
+    print("TEST: Próbuję wysłać wiadomość testową na Discord...")
+    
+    if not DISCORD_WEBHOOK:
+        print("BŁĄD TESTOWY: Brak zmiennej DISCORD_WEBHOOK. Nie można testować.")
+        return False
+        
+    try:
+        webhook = DiscordWebhook(url=DISCORD_WEBHOOK)
+        
+        embed = DiscordEmbed(
+            title="✅ TEST POŁĄCZENIA Z BOTEM OLX",
+            description="Jeśli widzisz tę wiadomość, Twój Webhook działa poprawnie!",
+            color='00FF00' # Zielony
+        )
+        embed.set_footer(text=f"Czas testu: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+        
+        webhook.add_embed(embed)
+        response = webhook.execute()
+
+        # Kod 204 oznacza sukces (No Content), 200 też może się pojawić
+        if response.status_code in [200, 204]:
+            print("TEST: Sukces! Wiadomość testowa wysłana na Discorda.")
+            return True
+        else:
+            print(f"TEST: BŁĄD! Discord zwrócił status: {response.status_code}")
+            print("Prawdopodobnie Webhook URL jest nieprawidłowy lub został usunięty.")
+            return False
+
+    except Exception as e:
+        print(f"TEST: Wystąpił nieoczekiwany błąd podczas wysyłania: {e}")
+        return False
 
 def load_seen_ads():
     """Wczytuje zbiór ID ogłoszeń z pliku."""
