@@ -57,7 +57,28 @@ def wyslij_powiadomienie(ogloszenie):
     
     if response.status_code not in [200, 204]:
         print(f"Błąd podczas wysyłania na Discord: {response.status_code} - Sprawdź Webhook URL.")
+        
+def wyslij_status_discord(wiadomosc, kolor='0099ff'):
+    """Wysyła krótką wiadomość statusu na Discorda."""
+    global DISCORD_WEBHOOK
+    
+    # Wysyłamy status tylko, jeśli Webhook jest ustawiony
+    if not DISCORD_WEBHOOK:
+        return
 
+    try:
+        webhook = DiscordWebhook(url=DISCORD_WEBHOOK)
+        embed = DiscordEmbed(
+            title=f"⏳ STATUS MONITORINGU",
+            description=wiadomosc,
+            color=kolor # Niebieski dla statusu, Żółty dla braku ofert
+        )
+        embed.set_timestamp()
+        
+        # Wykonaj wysyłkę w tle, aby nie blokować głównej pętli
+        webhook.execute() 
+    except Exception as e:
+        print(f"Błąd podczas wysyłania statusu na Discord: {e}")
 def test_discord_connection():
     """Wysyła prostą wiadomość testową na Discorda."""
     global DISCORD_WEBHOOK
@@ -170,7 +191,6 @@ def sprawdz_olx():
 def bot_loop():
     """Główna pętla, która będzie uruchamiana w tle w osobnym wątku."""
     
-    # 1. Sprawdzenie i test przy starcie
     if not DISCORD_WEBHOOK:
         print("BŁĄD KRYTYCZNY: Webhook nieustawiony. Bot nie rozpocznie pracy.")
         return
@@ -179,16 +199,30 @@ def bot_loop():
          print("BŁĄD KRYTYCZNY: Połączenie z Discordem nieudane. Bot nie rozpocznie pracy.")
          return 
 
-    # 2. Uruchomienie pierwszej kontroli i głównej pętli
-    print("Test Discord OK. Pierwsze uruchomienie: zapamiętuję istniejące ogłoszenia...")
+    # Uruchomienie pierwszej kontroli
     sprawdz_olx() 
-    print("Rozpoczynam monitorowanie w pętli.")
+    print(f"Zakończono sprawdzanie. Wysłałem {powiadomienia_wyslane} nowych powiadomień. Znanych ID: {len(scraped_post_ids)}")
+    # Zwracamy liczbę nowych ogłoszeń
+    return powiadomienia_wyslane
     
     while True:
         try:
-            sprawdz_olx()
+            # 1. INFORMUJEMY O ROZPOCZĘCIU SPRAWDZANIA
+            wyslij_status_discord("Sprawdzam nowe ogłoszenia...")
+            
+            # Właściwe sprawdzenie OLX
+            nowe_ogloszenia_w_cyklu = sprawdz_olx() # Zmieniamy sprawdz_olx, aby zwracała liczbę znalezionych ofert
+            
+            # 2. INFORMUJEMY O WYNIKACH SPRAWDZANIA
+            if nowe_ogloszenia_w_cyklu == 0:
+                wyslij_status_discord("Brak nowych ogłoszeń. Czekam 5 minut.", kolor='ffcc00') # Żółty
+            else:
+                # Jeśli są nowe, powiadomienia są już wysłane przez sprawdz_olx
+                wyslij_status_discord(f"Znaleziono {nowe_ogloszenia_w_cyklu} nowych ogłoszeń! 🎉") 
+                
         except Exception as e:
             print(f"Wystąpił nieoczekiwany błąd w pętli: {e}")
+            wyslij_status_discord(f"Wystąpił błąd w pętli: {e}", kolor='ff0000') # Czerwony
         
         # Czekanie 5 minut (300 sekund)
         print("Czekam 5 minut...")
