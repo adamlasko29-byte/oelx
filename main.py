@@ -40,6 +40,7 @@ intents.message_content = True # Wymagane dla botów.
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # --- Funkcje Pomocnicze ---
+
 def load_seen_ads():
     """Wczytuje zbiór ID ogłoszeń z pliku."""
     global seen_ads
@@ -165,10 +166,10 @@ async def check_for_new_ads():
             print(f"Znaleziono {len(new_ads)} nowych ogłoszeń. Wysyłam na Discord...")
             for ad in new_ads:
                 message = (
-                    f"🔔 **NOWE OGŁOSZENIE OLX!** 🔔\n"
-                    f"**Tytuł:** {ad['title']}\n"
-                    f"**Cena:** {ad['price']}\n"
-                    f"**Link:** {ad['link']}"
+                    f"🔔 *NOWE OGŁOSZENIE OLX!* 🔔\n"
+                    f"*Tytuł:* {ad['title']}\n"
+                    f"*Cena:* {ad['price']}\n"
+                    f"*Link:* {ad['link']}"
                 )
                 await channel.send(message)
         else:
@@ -204,4 +205,4 @@ def start_bot():
 t = Thread(target=start_bot)
 t.start()
 
-# Render teraz wraca do Gunicorna, który może otworzyć port.
+# Render teraz wraca do Gunicorna
