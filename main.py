@@ -9,7 +9,7 @@ import re
 
 # 🚨 TUTAJ WKLEJ SWÓJ GOTOWY LINK Z FILTROWANIEM 
 # PRZYKLAD: "https://www.olx.pl/elektronika/telefony/q-iphone-13-14/?search%5Bfilter_float_price%3Ato%5D=900&search%5Bcity_id%5D=14728"
-OLX_SEARCH_URL = "Wklej tutaj Twój link do OLX z filtrami" 
+OLX_SEARCH_URL = "https://www.olx.pl/elektronika/telefony/jaroszow/q-iphone/?search%5Bdist%5D=50&search%5Bfilter_float_price:to%5D=900" 
 
 # Pobiera URL webhooka z ustawień Render.com (Zmienna środowiskowa DISCORD_WEBHOOK)
 DISCORD_WEBHOOK = os.environ.get('DISCORD_WEBHOOK') 
