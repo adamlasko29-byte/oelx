@@ -1,3 +1,5 @@
 requests
 beautifulsoup4
 discord-webhook
+flask
+gunicorn  # Dodaj gunicorn, jeśli go nie miałeś!
